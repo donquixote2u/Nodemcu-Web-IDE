@@ -1,13 +1,8 @@
 --[[
-XChip's NodeMCU IDE
-Original Source: http://www.esp8266.com/viewtopic.php?f=19&t=1549
-
-Petr Stehlik found the source in October 2016 and gave it a new home
-at https://github.com/joysfera/nodemcu-web-ide under the GPL license.
-Then updated it for new async socket send(), fixed, cleaned up,
-added external editor with syntax highlighting and further improves it.
-
 Create, Edit and run NodeMCU files using your web browser.
+XChip's NodeMCU IDE Original Source: http://www.esp8266.com/viewtopic.php?f=19&t=1549
+update by Petr Stehlik  https://github.com/joysfera/nodemcu-web-ide 
+
 Examples:
 http://<mcu_ip>/ will list all the files in the MCU
 http://<mcu_ip>/newfile.lua    displays the file on your browser
@@ -15,10 +10,10 @@ http://<mcu_ip>/newfile.lua?edit  allows to creates or edits the specified scrip
 http://<mcu_ip>/newfile.lua?run   it will run the specified script and will show the returned value
 --]]
 
-local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Cloud Editor
- local AceEnabled = aceEnabled == nil and true or aceEnabled
- srv = net.createServer(net.TCP)
- srv:listen(80, function(conn)
+local AceEnabled = true -- feel free to enable or disable the shiny Ajax.org Cloud Editor
+
+srv = net.createServer(net.TCP)
+srv:listen(80, function(conn)
 
   local rnrn = 0
   local Status = 0
@@ -118,15 +113,8 @@ local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Clo
     
     if vars == "edit" then
         if AceEnabled then
-            local mode = 'ace/mode/'
-            if url:match(".css") then mode = mode .. 'css'
-            elseif url:match(".html") then mode = mode .. 'html'
-            elseif url:match(".json") then mode = mode .. 'json'
-            elseif url:match(".js") then mode = mode .. 'javascript'
-            else mode = mode .. 'lua'
-            end
             sen = sen .. "<style type='text/css'>#editor{width: 100%; height: 80%}</style><div id='editor'></div><script src='//rawgit.com/ajaxorg/ace-builds/master/src-min-noconflict/ace.js'></script>"
-                .. "<script>var e=ace.edit('editor');e.setTheme('ace/theme/monokai');e.getSession().setMode('"..mode.."');function getSource(){return e.getValue();};function setSource(s){e.setValue(s);}</script>"
+                .. "<script>var e=ace.edit('editor');e.setTheme('ace/theme/monokai');e.getSession().setMode('ace/mode/lua');function getSource(){return e.getValue();};function setSource(s){e.setValue(s);}</script>"
         else
             sen = sen .. "<textarea name=t cols=79 rows=17></textarea></br>"
                 .. "<script>function getSource() {return document.getElementsByName('t')[0].value;};function setSource(s) {document.getElementsByName('t')[0].value = s;};</script>"
@@ -145,21 +133,12 @@ local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Clo
         -- delay the output capture by 1000 milliseconds to give some time to the user routine in pcall()
         tmr.alarm(0, 1000, tmr.ALARM_SINGLE, function() 
             node.output(nil)
-            if result then
-                local outp = tostring(result):sub(1,1300) -- to fit in one send() packet
-                result = nil
-                sen = sen .. "<br>Result of the run: " .. outp .. "<br>"
-            end
+            if result then sen = sen .. "<br>Result of the run: " .. tostring(result) .. "<br>" end
             sen = sen .. "</verbatim></body></html>"
             sck:send(sen)
         end)
 
         return
-
-    elseif vars == "compile" then
-        collectgarbage()
-        node.compile(url)
-        url = ""
 
     elseif vars == "delete" then
         file.remove(url)
@@ -167,7 +146,6 @@ local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Clo
 
     elseif vars == "restart" then
         node.restart()
-        url = ""
 
     end
 
@@ -176,21 +154,10 @@ local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Clo
     sen = nil
     if url == "" then
         local l = file.list();
-        message[#message + 1] = "<table border=1 cellpadding=3><tr><th>Name</th><th>Size</th><th>Edit</th><th>Compile</th><th>Delete</th></tr>"
-        for k,v in pairs(l) do
-            local line = "<tr><td><a href='" ..k.. "'>" ..k.. "</a></td><td>" ..v.. "</td><td>"
-            local editable = k:sub(-4, -1) == ".lua" or k:sub(-4, -1) == ".css" or k:sub(-5, -1) == ".html" or k:sub(-5, -1) == ".json"
-            if editable then
-                line = line .. "<a href='" ..k.. "?edit'>edit</a>"
-            end
-            line = line .. "</td><td>"
-            if k:sub(-4, -1) == ".lua" then
-                line = line .. "<a href='" ..k.. "?compile'>compile</a>"
-            end
-            line = line .. "</td><td><a href='" ..k.. "?delete'>delete</a></td></tr>"
-            message[#message + 1] = line
+        for k,v in pairs(l) do  
+            message[#message + 1] = "<a href='" ..k.. "?edit'>" ..k.. "</a>, size: " ..v.. " <a href='" ..k.. "?delete'>delete</a><br>"
         end
-        message[#message + 1] = "</table><a href='#' onclick='v=prompt(\"Filename\");if (v!=null) { this.href=\"/\"+v+\"?edit\"; return true;} else return false;'>Create new</a> &nbsp; &nbsp; <a href='#' onclick='var x=new XMLHttpRequest();x.open(\"GET\",\"/?restart\");x.send();setTimeout(function(){location.href=\"/\"},5000);document.write(\"Please wait\");return false'>Restart</a>"
+        message[#message + 1] = "<a href='#' onclick='v=prompt(\"Filename\");if (v!=null) { this.href=\"/\"+v+\"?edit\"; return true;} else return false;'>Create new</a> &nbsp; &nbsp; <a href='#' onclick='var x=new XMLHttpRequest();x.open(\"GET\",\"/?restart\");x.send();setTimeout(function(){location.href=\"/\"},5000);document.write(\"Please wait\");return false'>Restart</a>"
     end
     message[#message + 1] = "</body></html>"
 
@@ -224,17 +191,6 @@ local function editor(aceEnabled) -- feel free to disable the shiny Ajax.org Clo
     sck:close()
     sck = nil
   end)
- end)
-end
+end)
 
-if wifi.sta.status() == wifi.STA_GOTIP then
-    print("http://"..wifi.sta.getip().."/")
-    editor()
-else
-    print("WiFi connecting...")
-    wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function()
-        wifi.eventmon.unregister(wifi.eventmon.STA_GOT_IP)
-        print("http://"..wifi.sta.getip().."/")
-        editor()
-    end)
-end
+print("listening at " .. wifi.sta.getip() .. ", free: " .. node.heap())
