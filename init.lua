@@ -1,21 +1,15 @@
--- telnet console 
---manifest: connectIP.lua, ide.lua
--- todo: convert timers to locally defined (general timers deprecated)
- -- Constants
-SSID    = "98FM"
-APPWD   = "potentiometer"
+-- accept data via webserver GET, display on web and screen
+--manifest: checkwifi.lua, screen.lua, webface.lua, webserverlua
+--new manifest: screen.lua,connectIP.lua, ide.lua, wificredentials.lua
+-- Constants
+require("wificredentials")
 -- Some control variables
-wifiTrys     = 0      -- Counter of trys to connect to wifi
-NUMWIFITRYS  = 200    -- Maximum number of WIFI Testings while waiting for connection
-function checkConn()    -- wait for internet
- if(CONNECTED) then
-    tmr.stop(2)
-    require("ide") -- once connected, start server
- else
-    tmr.alarm( 2, 2000, 0, checkConn)
- end
+wifiTrys     = 0      -- reset counter of trys to connect to wifi
+NUMWIFITRYS  = 20    -- Maximum number of WIFI Testings while waiting for connection
+require("WifiConnect")
+function init_webserver()
+dofile("ide.lua")
 end
-tmr.alarm( 1 , 3000, 0 , function() require("connectIP") end )
-tmr.alarm( 2 , 5000, 0 , checkConn )
--- Drop through here to let NodeMcu run
-
+initTimeout=2000       -- // timer in ms
+initTimer=tmr.create()  -- // start timer
+initTimer:alarm(initTimeout,tmr.ALARM_SINGLE,function() checkConnection(init_webserver) end) 
